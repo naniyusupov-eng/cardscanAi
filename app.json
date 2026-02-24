@@ -1,0 +1,16 @@
+{
+  "expo": {
+    "name": "cardScanAi",
+    "slug": "cardScanAi",
+    "version": "1.0.0",
+    "scheme": "cardscanai",
+    "userInterfaceStyle": "light",
+    "newArchEnabled": false,
+    "android": {
+      "edgeToEdgeEnabled": false
+    },
+    "plugins": [
+      "expo-router"
+    ]
+  }
+}
