@@ -16,7 +16,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Menu, Search, Scan, Settings, Bell, Info, CreditCard, ShieldCheck, LogOut, ArrowLeft, X, Zap, Folder, Plus, ChevronRight, Star, LayoutGrid, Grid3X3 as Grid3 } from 'lucide-react-native';
+import { Menu, Search, Scan, Settings, Bell, Info, CreditCard, ShieldCheck, LogOut, ChevronLeft, ChevronRight, X, Zap, Folder, Plus, Minus, Star, LayoutGrid, Grid3X3 as Grid3 } from 'lucide-react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import Svg, { Rect, Defs, LinearGradient as SvgGradient, Stop } from 'react-native-svg';
 
@@ -48,6 +48,10 @@ export default function CardScanScreen() {
     const [gridColumns, setGridColumns] = useState(2);
     const [searchQuery, setSearchQuery] = useState('');
     const [isSearching, setIsSearching] = useState(false);
+    const [selectedEra, setSelectedEra] = useState<any>(null);
+    const [selectedSet, setSelectedSet] = useState<any>(null);
+    const [isSelectionMode, setIsSelectionMode] = useState(false);
+    const [cardCounts, setCardCounts] = useState<{ [key: number]: number }>({});
 
     const [permission, requestPermission] = useCameraPermissions();
 
@@ -181,12 +185,24 @@ export default function CardScanScreen() {
                 ) : isCollections ? (
                     <View style={styles.settingsPage}>
                         <View style={styles.settingsHeader}>
-                            <TouchableOpacity style={styles.backBtn} onPress={() => { setIsCollections(false); setIsSearching(false); setSearchQuery(''); }}>
-                                <ArrowLeft color="#FFF" size={24} />
+                            <TouchableOpacity style={styles.backBtn} onPress={() => {
+                                if (selectedSet) {
+                                    setSelectedSet(null);
+                                    setIsSelectionMode(false);
+                                    setCardCounts({});
+                                } else if (selectedEra) {
+                                    setSelectedEra(null);
+                                } else {
+                                    setIsCollections(false);
+                                }
+                                setIsSearching(false);
+                                setSearchQuery('');
+                            }}>
+                                <ChevronLeft color="#FFF" size={28} />
                             </TouchableOpacity>
                             {!isSearching ? (
                                 <>
-                                    <Text style={styles.settingsTitle}>My Collection</Text>
+                                    <Text style={styles.settingsTitle} numberOfLines={1}>{selectedSet ? selectedSet.name : (selectedEra ? selectedEra.title : 'My Collection')}</Text>
                                     <TouchableOpacity style={styles.headerIconBtn} onPress={() => setIsSearching(true)}>
                                         <Search color="#FFF" size={26} strokeWidth={1.5} />
                                     </TouchableOpacity>
@@ -210,91 +226,224 @@ export default function CardScanScreen() {
                         </View>
 
                         <View style={styles.dashContent}>
-                            <View style={[styles.statsRow, { marginBottom: 35, alignItems: 'center' }]}>
-                                <View style={styles.statBox}>
-                                    <Text style={styles.statValSmall}>128</Text>
-                                    <Text style={styles.statLabel}>Total Cards</Text>
+                            {selectedSet ? (
+                                <View style={styles.largeLogoContainer}>
+                                    <Image source={{ uri: selectedSet.logo }} style={styles.largeSetLogo} />
                                 </View>
-                                <View style={styles.statBox}>
-                                    <Text style={[styles.statVal, { color: COLORS.energy, fontSize: 32 }]}>$12.4k</Text>
-                                    <Text style={[styles.statLabel, { color: 'rgba(255,255,255,0.6)' }]}>Est. Value</Text>
+                            ) : (
+                                <View style={[styles.statsRow, { marginBottom: 35, alignItems: 'center' }]}>
+                                    <View style={styles.statBox}>
+                                        <Text style={styles.statValSmall}>{selectedEra ? selectedEra.sets.reduce((acc: number, s: any) => acc + s.count, 0) : 128}</Text>
+                                        <Text style={styles.statLabel}>Total Cards</Text>
+                                    </View>
+                                    <View style={styles.statBox}>
+                                        <Text style={[styles.statVal, { color: COLORS.energy, fontSize: 32 }]}>{selectedEra ? `$${(selectedEra.sets.reduce((acc: number, s: any) => acc + s.count * 15, 0) / 1000).toFixed(1)}k` : '$12.4k'}</Text>
+                                        <Text style={[styles.statLabel, { color: 'rgba(255,255,255,0.6)' }]}>Est. Value</Text>
+                                    </View>
+                                    <View style={styles.statBox}>
+                                        <Text style={styles.statValSmall}>{selectedEra ? `${Math.round((selectedEra.sets.reduce((acc: number, s: any) => acc + s.count, 0) / selectedEra.sets.reduce((acc: number, s: any) => acc + s.total, 0)) * 100)}%` : '+14%'}</Text>
+                                        <Text style={styles.statLabel}>{selectedEra ? 'Completion' : 'Growth'}</Text>
+                                    </View>
                                 </View>
-                                <View style={styles.statBox}>
-                                    <Text style={styles.statValSmall}>+14%</Text>
-                                    <Text style={styles.statLabel}>Growth</Text>
-                                </View>
-                            </View>
+                            )}
 
-                            <View style={{ marginBottom: 20, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-                                <View style={{ flex: 1 }}>
-                                    <ScrollView
-                                        horizontal
-                                        showsHorizontalScrollIndicator={false}
-                                        contentContainerStyle={{ gap: 8 }}
+                            {selectedEra && !selectedSet && <View style={styles.eraPageDivider} />}
+
+                            {!selectedEra && (
+                                <View style={{ marginBottom: 20, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                                    <View style={{ flex: 1 }}>
+                                        <ScrollView
+                                            horizontal
+                                            showsHorizontalScrollIndicator={false}
+                                            contentContainerStyle={{ gap: 8 }}
+                                        >
+                                            {['All', 'Pokémon', 'Yu-Gi-Oh!', 'Magic', 'Sports'].map((cat, i) => (
+                                                <TouchableOpacity
+                                                    key={i}
+                                                    onPress={() => setActiveCategory(cat)}
+                                                    style={[styles.filterTab, activeCategory === cat && styles.filterTabActive, { marginRight: 8 }]}
+                                                >
+                                                    <Text style={[styles.filterText, activeCategory === cat && styles.filterTextActive, { fontSize: 12 }]}>{cat}</Text>
+                                                </TouchableOpacity>
+                                            ))}
+                                        </ScrollView>
+                                    </View>
+                                    <TouchableOpacity
+                                        style={[styles.layoutToggleBtn, { marginLeft: 15, backgroundColor: 'rgba(255,255,255,0.05)', width: 40, height: 40 }]}
+                                        onPress={() => setGridColumns(gridColumns === 2 ? 3 : 2)}
                                     >
-                                        {['All', 'Pokémon', 'Yu-Gi-Oh!', 'Magic', 'Sports'].map((cat, i) => (
-                                            <TouchableOpacity
-                                                key={i}
-                                                onPress={() => setActiveCategory(cat)}
-                                                style={[styles.filterTab, activeCategory === cat && styles.filterTabActive, { marginRight: 8 }]}
-                                            >
-                                                <Text style={[styles.filterText, activeCategory === cat && styles.filterTextActive, { fontSize: 12 }]}>{cat}</Text>
-                                            </TouchableOpacity>
-                                        ))}
-                                    </ScrollView>
+                                        {gridColumns === 2 ? <Grid3 color={COLORS.energy} size={20} /> : <LayoutGrid color={COLORS.energy} size={20} />}
+                                    </TouchableOpacity>
                                 </View>
-                                <TouchableOpacity
-                                    style={[styles.layoutToggleBtn, { marginLeft: 15, backgroundColor: 'rgba(255,255,255,0.05)', width: 40, height: 40 }]}
-                                    onPress={() => setGridColumns(gridColumns === 2 ? 3 : 2)}
-                                >
-                                    {gridColumns === 2 ? <Grid3 color={COLORS.energy} size={20} /> : <LayoutGrid color={COLORS.energy} size={20} />}
-                                </TouchableOpacity>
-                            </View>
+                            )}
+
+                            {selectedSet && (
+                                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20, paddingHorizontal: 2 }}>
+                                    <TouchableOpacity
+                                        style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(255,255,255,0.05)', justifyContent: 'center', alignItems: 'center' }}
+                                        onPress={() => setGridColumns(gridColumns === 2 ? 3 : 2)}
+                                    >
+                                        {gridColumns === 2 ? <Grid3 color="#FFF" size={20} /> : <LayoutGrid color="#FFF" size={20} />}
+                                    </TouchableOpacity>
+
+                                    <TouchableOpacity
+                                        style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: isSelectionMode ? COLORS.energy : 'rgba(255,255,255,0.1)', justifyContent: 'center', alignItems: 'center' }}
+                                        onPress={() => setIsSelectionMode(!isSelectionMode)}
+                                    >
+                                        {isSelectionMode ? <X color="#000" size={22} /> : <Plus color="#FFF" size={22} />}
+                                    </TouchableOpacity>
+                                </View>
+                            )}
 
                             <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 100 }}>
                                 <View style={styles.cardsGridWrap}>
-                                    {[
-                                        { name: 'Charizard VMAX', price: '$420', img: 'https://images.pokemontcg.io/swsh4/25.png', type: 'Pokémon' },
-                                        { name: 'Mewtwo GX', price: '$180', img: 'https://images.pokemontcg.io/sm35/31.png', type: 'Pokémon' },
-                                        { name: 'Pikachu V', price: '$85', img: 'https://images.pokemontcg.io/swsh4/44.png', type: 'Pokémon' },
-                                        { name: 'Lugia VSTAR', price: '$210', img: 'https://images.pokemontcg.io/swsh12/139.png', type: 'Pokémon' },
-                                        { name: 'Umbreon VMAX', price: '$650', img: 'https://images.pokemontcg.io/swsh7/215.png', type: 'Pokémon' },
-                                        { name: 'Rayquaza VMAX', price: '$340', img: 'https://images.pokemontcg.io/swsh7/218.png', type: 'Pokémon' },
-                                        { name: 'Dark Magician', price: '$120', img: 'https://images.ygoprodeck.com/images/cards/46986414.jpg', type: 'Yu-Gi-Oh!' },
-                                    ].filter(c =>
-                                        (activeCategory === 'All' || c.type === activeCategory) &&
-                                        (c.name.toLowerCase().includes(searchQuery.toLowerCase()))
-                                    ).map((card, idx) => (
-                                        <TouchableOpacity
-                                            key={idx}
-                                            style={[
-                                                styles.collectionCardItem,
-                                                { width: gridColumns === 2 ? (width - 55) / 2 : (width - 70) / 3 }
-                                            ]}
-                                            activeOpacity={0.8}
-                                        >
-                                            <View style={[styles.collectionCardImg, { height: gridColumns === 2 ? 210 : 130, backgroundColor: 'rgba(255,255,255,0.03)', justifyContent: 'center', alignItems: 'center' }]}>
-                                                {card.img ? (
-                                                    <Image source={{ uri: card.img }} style={{ width: '100%', height: '100%', borderRadius: 6, resizeMode: 'contain' }} />
-                                                ) : (
-                                                    <Zap color="rgba(255,255,255,0.1)" size={gridColumns === 2 ? 40 : 24} />
-                                                )}
+                                    {!selectedEra ? (
+                                        [
+                                            { name: 'Charizard VMAX', price: '$420', img: 'https://images.pokemontcg.io/swsh4/25.png', type: 'Pokémon' },
+                                            { name: 'Mewtwo GX', price: '$180', img: 'https://images.pokemontcg.io/sm35/31.png', type: 'Pokémon' },
+                                            { name: 'Pikachu V', price: '$85', img: 'https://images.pokemontcg.io/swsh4/44.png', type: 'Pokémon' },
+                                            { name: 'Lugia VSTAR', price: '$210', img: 'https://images.pokemontcg.io/swsh12/139.png', type: 'Pokémon' },
+                                            { name: 'Umbreon VMAX', price: '$650', img: 'https://images.pokemontcg.io/swsh7/215.png', type: 'Pokémon' },
+                                            { name: 'Rayquaza VMAX', price: '$340', img: 'https://images.pokemontcg.io/swsh7/218.png', type: 'Pokémon' },
+                                            { name: 'Dark Magician', price: '$120', img: 'https://images.ygoprodeck.com/images/cards/46986414.jpg', type: 'Yu-Gi-Oh!' },
+                                        ].filter(c =>
+                                            (activeCategory === 'All' || c.type === activeCategory) &&
+                                            (c.name.toLowerCase().includes(searchQuery.toLowerCase()))
+                                        ).map((card, idx) => (
+                                            <TouchableOpacity
+                                                key={idx}
+                                                style={[
+                                                    styles.collectionCardItem,
+                                                    { width: gridColumns === 2 ? (width - 55) / 2 : (width - 70) / 3 }
+                                                ]}
+                                                activeOpacity={0.8}
+                                            >
+                                                <View style={[styles.collectionCardImg, { height: gridColumns === 2 ? 210 : 130, backgroundColor: 'rgba(255,255,255,0.03)', justifyContent: 'center', alignItems: 'center' }]}>
+                                                    {card.img ? (
+                                                        <Image source={{ uri: card.img }} style={{ width: '100%', height: '100%', borderRadius: 6, resizeMode: 'contain' }} />
+                                                    ) : (
+                                                        <Zap color="rgba(255,255,255,0.1)" size={gridColumns === 2 ? 40 : 24} />
+                                                    )}
+                                                </View>
+                                                <View style={styles.cardItemInfo}>
+                                                    <Text style={[styles.cardItemName, { fontSize: gridColumns === 2 ? 14 : 11 }]} numberOfLines={1}>{card.name}</Text>
+                                                    <Text style={[styles.cardItemPrice, { fontSize: gridColumns === 2 ? 13 : 10 }]}>{card.price}</Text>
+                                                </View>
+                                            </TouchableOpacity>
+                                        ))
+                                    ) : selectedSet ? (
+                                        <View style={styles.cardsGridWrap}>
+                                            {[
+                                                { id: 1, name: 'Charizard ex', price: '$120', img: 'https://images.pokemontcg.io/sv3/125.png' },
+                                                { id: 2, name: 'Dragonite V', price: '$85', img: 'https://images.pokemontcg.io/swsh7/192.png' },
+                                                { id: 3, name: 'Gengar VMAX', price: '$320', img: 'https://images.pokemontcg.io/swsh8/157.png' },
+                                                { id: 4, name: 'Rayquaza ex', price: '$210', img: 'https://images.pokemontcg.io/sv4/151.png' },
+                                                { id: 5, name: 'Blastoise ex', price: '$65', img: 'https://images.pokemontcg.io/sv3pt5/9.png' },
+                                                { id: 6, name: 'Venusaur ex', price: '$58', img: 'https://images.pokemontcg.io/sv3pt5/3.png' },
+                                                { id: 7, name: 'Lugia ex', price: '$140', img: 'https://images.pokemontcg.io/sv4/135.png' },
+                                                { id: 8, name: 'Mew ex', price: '$190', img: 'https://images.pokemontcg.io/sv3pt5/151.png' },
+                                            ].filter(c => c.name.toLowerCase().includes(searchQuery.toLowerCase())).map((card) => {
+                                                const count = cardCounts[card.id] || 0;
+                                                return (
+                                                    <View
+                                                        key={card.id}
+                                                        style={[
+                                                            styles.collectionCardItem,
+                                                            { width: gridColumns === 2 ? (width - 55) / 2 : (width - 70) / 3 },
+                                                            count > 0 && { borderColor: COLORS.energy, borderWidth: 2 }
+                                                        ]}
+                                                    >
+                                                        <View style={[styles.collectionCardImg, { height: gridColumns === 2 ? 210 : 130, backgroundColor: 'rgba(255,255,255,0.03)', justifyContent: 'center', alignItems: 'center' }]}>
+                                                            <Image source={{ uri: card.img }} style={{ width: '100%', height: '100%', borderRadius: 6, resizeMode: 'contain' }} />
+                                                            {count > 0 && !isSelectionMode && (
+                                                                <View style={styles.cardQtyBadge}>
+                                                                    <Text style={styles.cardQtyText}>{count}</Text>
+                                                                </View>
+                                                            )}
+                                                        </View>
+                                                        <View style={styles.cardItemInfo}>
+                                                            <Text style={[styles.cardItemName, { fontSize: gridColumns === 2 ? 14 : 11 }]} numberOfLines={1}>{card.name}</Text>
+
+                                                            {isSelectionMode ? (
+                                                                <View style={[styles.counterRow, gridColumns === 3 && { padding: 2 }]}>
+                                                                    <TouchableOpacity
+                                                                        onPress={() => setCardCounts(prev => ({ ...prev, [card.id]: Math.max(0, (prev[card.id] || 0) - 1) }))}
+                                                                        style={[styles.counterBtn, gridColumns === 3 && { width: 20, height: 20 }]}
+                                                                    >
+                                                                        <Minus color="#FFF" size={gridColumns === 3 ? 12 : 14} />
+                                                                    </TouchableOpacity>
+                                                                    <Text style={[styles.counterVal, gridColumns === 3 && { fontSize: 12 }]}>{count}</Text>
+                                                                    <TouchableOpacity
+                                                                        onPress={() => setCardCounts(prev => ({ ...prev, [card.id]: (prev[card.id] || 0) + 1 }))}
+                                                                        style={[styles.counterBtn, { backgroundColor: COLORS.energy }, gridColumns === 3 && { width: 20, height: 20 }]}
+                                                                    >
+                                                                        <Plus color="#000" size={gridColumns === 3 ? 12 : 14} />
+                                                                    </TouchableOpacity>
+                                                                </View>
+                                                            ) : (
+                                                                <Text style={[styles.cardItemPrice, { fontSize: gridColumns === 2 ? 13 : 10 }]}>{card.price}</Text>
+                                                            )}
+                                                        </View>
+                                                    </View>
+                                                );
+                                            })}
+                                        </View>
+                                    ) : (
+                                        <View style={{ width: '100%' }}>
+                                            <View style={[styles.setsGrid, { paddingBottom: 50 }]}>
+                                                {selectedEra.sets.filter((s: any) => s.name.toLowerCase().includes(searchQuery.toLowerCase())).map((set: any, idx: number) => (
+                                                    <TouchableOpacity key={idx} style={[styles.setCard, { width: '100%', marginBottom: 15 }]} activeOpacity={0.7} onPress={() => setSelectedSet(set)}>
+                                                        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                                                            <View style={styles.setLogoContainer}>
+                                                                <Image source={{ uri: set.logo }} style={styles.setLogo} />
+                                                            </View>
+                                                            <View style={{ flex: 1 }}>
+                                                                <View style={styles.setCardInfo}>
+                                                                    <Text style={styles.setCardName}>{set.name}</Text>
+                                                                    <Text style={styles.setCardCount}>{set.count}/{set.total}</Text>
+                                                                </View>
+                                                                <View style={styles.progressContainer}>
+                                                                    <View style={styles.progressBarBg}>
+                                                                        <View style={[styles.progressBarFill, { width: `${(set.count / set.total) * 100}%`, backgroundColor: set.color }]} />
+                                                                    </View>
+                                                                    <Text style={styles.progressPct}>{Math.round((set.count / set.total) * 100)}%</Text>
+                                                                </View>
+                                                            </View>
+                                                        </View>
+                                                    </TouchableOpacity>
+                                                ))}
                                             </View>
-                                            <View style={styles.cardItemInfo}>
-                                                <Text style={[styles.cardItemName, { fontSize: gridColumns === 2 ? 14 : 11 }]} numberOfLines={1}>{card.name}</Text>
-                                                <Text style={[styles.cardItemPrice, { fontSize: gridColumns === 2 ? 13 : 10 }]}>{card.price}</Text>
-                                            </View>
-                                        </TouchableOpacity>
-                                    ))}
+                                        </View>
+                                    )}
                                 </View>
                             </ScrollView>
+
+
+
+                            {Object.values(cardCounts).reduce((a, b) => a + b, 0) > 0 && !isSelectionMode && (
+                                <View style={styles.addToCollectionPanel}>
+                                    <View style={{ flex: 1 }}>
+                                        <Text style={{ color: '#FFF', fontSize: 16, fontWeight: '800' }}>{Object.values(cardCounts).reduce((a, b) => a + b, 0)} Cards</Text>
+                                        <Text style={{ color: 'rgba(255,255,255,0.4)', fontSize: 12 }}>Ready for your collection</Text>
+                                    </View>
+                                    <TouchableOpacity
+                                        style={styles.addCtaBtn}
+                                        onPress={() => {
+                                            alert(`${Object.values(cardCounts).reduce((a, b) => a + b, 0)} cards added!`);
+                                            setCardCounts({});
+                                        }}
+                                    >
+                                        <Text style={styles.addCtaText}>ADD</Text>
+                                    </TouchableOpacity>
+                                </View>
+                            )}
                         </View>
                     </View>
                 ) : isSettings ? (
                     <View style={styles.settingsPage}>
                         <View style={styles.settingsHeader}>
                             <TouchableOpacity style={styles.backBtn} onPress={() => setIsSettings(false)}>
-                                <ArrowLeft color="#FFF" size={24} />
+                                <ChevronLeft color="#FFF" size={28} />
                             </TouchableOpacity>
                             <Text style={styles.settingsTitle}>Settings</Text>
                             <View style={{ width: 40 }} />
@@ -372,95 +521,139 @@ export default function CardScanScreen() {
                         </View>
 
                         <ScrollView style={styles.dashContent} showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 120 }}>
-                            <View style={styles.heroStats}>
-                                <Text style={styles.heroLabel}>Estimated Portfolio Value</Text>
-                                <Text style={styles.heroPrice}>$12,480.<Text style={{ fontSize: 28 }}>50</Text></Text>
-                                <View style={styles.heroTrend}>
-                                    <Text style={styles.trendText}>+14.2% (+$1,540) this month</Text>
-                                </View>
-                            </View>
-
                             <TouchableOpacity
-                                style={styles.collectionsShortcut}
-                                activeOpacity={0.8}
+                                style={styles.heroCard}
+                                activeOpacity={0.9}
                                 onPress={() => setIsCollections(true)}
                             >
-                                <View>
-                                    <Text style={styles.shortcutTitle}>My Collections</Text>
-                                    <Text style={styles.shortcutSub}>4 Folders • 128 Cards</Text>
-                                </View>
-                                <Star color={COLORS.energy} size={42} fill={COLORS.energy} />
+                                <LinearGradient
+                                    colors={[COLORS.primaryViolet, COLORS.energyDark]}
+                                    start={{ x: 0, y: 0 }}
+                                    end={{ x: 1, y: 1 }}
+                                    style={styles.heroGradient}
+                                >
+                                    <View style={styles.heroTop}>
+                                        <Text style={styles.heroLabel}>My Collection</Text>
+                                        <ChevronRight color="#FFF" size={24} />
+                                    </View>
+
+                                    <Text style={styles.heroPrice}>$12,480.<Text style={{ fontSize: 24, opacity: 0.8 }}>50</Text></Text>
+
+                                    <View style={styles.heroDivider} />
+
+                                    <View style={styles.heroBottom}>
+                                        <View style={styles.heroStatItem}>
+                                            <Zap color="rgba(255,255,255,0.7)" size={16} />
+                                            <Text style={styles.heroStatText}>14% growth last month</Text>
+                                        </View>
+                                        <View style={{ width: 1, height: 12, backgroundColor: 'rgba(255,255,255,0.2)', marginHorizontal: 15 }} />
+                                        <View style={styles.heroStatItem}>
+                                            <Text style={styles.heroStatText}>128 Cards</Text>
+                                        </View>
+                                    </View>
+                                </LinearGradient>
                             </TouchableOpacity>
 
-                            <View style={{ marginTop: 10, paddingBottom: 20 }}>
-                                <View style={styles.collectionsHeader}>
-                                    <Text style={styles.sectionTitle}>MEGA EVOLUTION ERA</Text>
-                                    <TouchableOpacity onPress={() => setIsCollections(true)}>
-                                        <Text style={{ color: COLORS.energy, fontSize: 12, fontWeight: '700' }}>See All</Text>
-                                    </TouchableOpacity>
-                                </View>
+                            <View style={{ marginTop: 10, paddingBottom: 100 }}>
+                                {[
+                                    {
+                                        title: 'Scarlet & Violet Era',
+                                        sets: [
+                                            { name: 'Paldea Evolved', count: 18, total: 193, logo: 'https://images.pokemontcg.io/sv2/logo.png', color: '#ff1c1c' },
+                                            { name: 'Obsidian Flames', count: 92, total: 197, logo: 'https://images.pokemontcg.io/sv3/logo.png', color: '#ff6a00' },
+                                            { name: '151 Special Set', count: 148, total: 165, logo: 'https://images.pokemontcg.io/sv3pt5/logo.png', color: '#ffcc00' },
+                                            { name: 'Paradox Rift', count: 25, total: 182, logo: 'https://images.pokemontcg.io/sv4/logo.png', color: '#00ccff' },
+                                            { name: 'Temporal Forces', count: 42, total: 162, logo: 'https://images.pokemontcg.io/sv5/logo.png', color: '#ff00ff' },
+                                            { name: 'Twilight Masquerade', count: 15, total: 167, logo: 'https://images.pokemontcg.io/sv6/logo.png', color: '#00ffcc' },
+                                            { name: 'Shrouded Fable', count: 8, total: 64, logo: 'https://images.pokemontcg.io/sv6pt5/logo.png', color: '#6600ff' },
+                                            { name: 'Stellar Crown', count: 5, total: 142, logo: 'https://images.pokemontcg.io/sv7/logo.png', color: '#ff9900' },
+                                            { name: 'Surging Sparks', count: 0, total: 191, logo: 'https://images.pokemontcg.io/sv8/logo.png', color: '#ffff00' },
+                                            { name: 'Prismatic Evolutions', count: 0, total: 175, logo: 'https://images.pokemontcg.io/sv8pt5/logo.png', color: '#ff0066' },
+                                        ]
+                                    },
+                                    {
+                                        title: 'Pokemon TCG Pocket',
+                                        sets: [
+                                            { name: 'Genetic Apex', count: 182, total: 226, logo: 'https://images.pokemontcg.io/a1/logo.png', color: COLORS.energy },
+                                            { name: 'Mythical Island', count: 42, total: 86, logo: 'https://images.pokemontcg.io/sm3/logo.png', color: '#4facfe' },
+                                            { name: 'Island of Legend', count: 12, total: 94, logo: 'https://images.pokemontcg.io/sm4/logo.png', color: '#00f2fe' },
+                                        ]
+                                    },
+                                    {
+                                        title: 'Sword & Shield Era',
+                                        sets: [
+                                            { name: 'Silver Tempest', count: 42, total: 195, logo: 'https://images.pokemontcg.io/swsh12/logo.png', color: '#00f2fe' },
+                                            { name: 'Lost Origin', count: 25, total: 196, logo: 'https://images.pokemontcg.io/swsh11/logo.png', color: '#FF416C' },
+                                            { name: 'Crown Zenith', count: 154, total: 159, logo: 'https://images.pokemontcg.io/swsh12tg/logo.png', color: '#f093fb' },
+                                            { name: 'Astral Radiance', count: 88, total: 189, logo: 'https://images.pokemontcg.io/swsh10/logo.png', color: '#4facfe' },
+                                            { name: 'Brilliant Stars', count: 120, total: 172, logo: 'https://images.pokemontcg.io/swsh9/logo.png', color: '#ffcc00' },
+                                            { name: 'Fusion Strike', count: 45, total: 264, logo: 'https://images.pokemontcg.io/swsh8/logo.png', color: '#ff00ff' },
+                                            { name: 'Evolving Skies', count: 203, total: 203, logo: 'https://images.pokemontcg.io/swsh7/logo.png', color: '#00ffcc' },
+                                            { name: 'Chilling Reign', count: 12, total: 198, logo: 'https://images.pokemontcg.io/swsh6/logo.png', color: '#00ccff' },
+                                        ]
+                                    },
+                                    {
+                                        title: 'Mega Evolution Era',
+                                        sets: [
+                                            { name: 'Primal Clash', count: 42, total: 160, logo: 'https://images.pokemontcg.io/xy5/logo.png', color: '#00f2fe' },
+                                            { name: 'Roaring Skies', count: 12, total: 108, logo: 'https://images.pokemontcg.io/xy6/logo.png', color: '#FF416C' },
+                                            { name: 'Ancient Origins', count: 5, total: 98, logo: 'https://images.pokemontcg.io/xy7/logo.png', color: '#f093fb' },
+                                            { name: 'BREAKthrough', count: 82, total: 162, logo: 'https://images.pokemontcg.io/xy8/logo.png', color: '#ffcc00' },
+                                            { name: 'BREAKpoint', count: 34, total: 122, logo: 'https://images.pokemontcg.io/xy9/logo.png', color: '#00ccff' },
+                                            { name: 'Fates Collide', count: 15, total: 124, logo: 'https://images.pokemontcg.io/xy10/logo.png', color: '#ff00ff' },
+                                        ]
+                                    },
+                                    {
+                                        title: 'Sun & Moon Era',
+                                        sets: [
+                                            { name: 'Cosmic Eclipse', count: 15, total: 236, logo: 'https://images.pokemontcg.io/sm12/logo.png', color: '#4facfe' },
+                                            { name: 'Hidden Fates', count: 62, total: 68, logo: 'https://images.pokemontcg.io/sm9/logo.png', color: '#00f2fe' },
+                                            { name: 'Unified Minds', count: 24, total: 236, logo: 'https://images.pokemontcg.io/sm11/logo.png', color: '#ffcc00' },
+                                            { name: 'Unbroken Bonds', count: 8, total: 214, logo: 'https://images.pokemontcg.io/sm10/logo.png', color: '#ff00ff' },
+                                            { name: 'Team Up', count: 42, total: 181, logo: 'https://images.pokemontcg.io/sm9/logo.png', color: '#00ffcc' },
+                                            { name: 'Lost Thunder', count: 0, total: 214, logo: 'https://images.pokemontcg.io/sm8/logo.png', color: '#ff6a00' },
+                                            { name: 'Celestial Storm', count: 0, total: 168, logo: 'https://images.pokemontcg.io/sm7/logo.png', color: '#00ccff' },
+                                        ]
+                                    }
+                                ].map((section, sIdx) => {
+                                    const filteredSets = section.sets.filter(s => s.name.toLowerCase().includes(searchQuery.toLowerCase()));
+                                    if (filteredSets.length === 0) return null;
 
-                                <View style={styles.setsGrid}>
-                                    {[
-                                        { name: 'Primal Clash', count: 42, total: 160, logo: 'https://images.pokemontcg.io/xy5/logo.png', color: '#00f2fe' },
-                                        { name: 'Roaring Skies', count: 12, total: 108, logo: 'https://images.pokemontcg.io/xy6/logo.png', color: '#FF416C' },
-                                        { name: 'Ancient Origins', count: 5, total: 98, logo: 'https://images.pokemontcg.io/xy7/logo.png', color: '#f093fb' },
-                                    ].filter(s => s.name.toLowerCase().includes(searchQuery.toLowerCase())).map((set, idx) => (
-                                        <TouchableOpacity key={idx} style={styles.setCard} onPress={() => setIsCollections(true)}>
-                                            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                                                <View style={styles.setLogoContainer}>
-                                                    <Image source={{ uri: set.logo }} style={styles.setLogo} />
-                                                </View>
-                                                <View style={{ flex: 1 }}>
-                                                    <View style={styles.setCardInfo}>
-                                                        <Text style={styles.setCardName}>{set.name}</Text>
-                                                        <Text style={styles.setCardCount}>{set.count}/{set.total}</Text>
-                                                    </View>
-                                                    <View style={styles.progressContainer}>
-                                                        <View style={styles.progressBarBg}>
-                                                            <View style={[styles.progressBarFill, { width: `${(set.count / set.total) * 100}%`, backgroundColor: set.color }]} />
-                                                        </View>
-                                                        <Text style={styles.progressPct}>{Math.round((set.count / set.total) * 100)}%</Text>
-                                                    </View>
-                                                </View>
+                                    return (
+                                        <View key={sIdx} style={{ marginTop: sIdx === 0 ? 0 : 35 }}>
+                                            <View style={styles.collectionsHeader}>
+                                                <Text style={styles.sectionTitle}>{section.title}</Text>
+                                                <TouchableOpacity onPress={() => { setSelectedEra(section); setIsCollections(true); }}>
+                                                    <Text style={{ color: COLORS.energy, fontSize: 12, fontWeight: '700' }}>See All</Text>
+                                                </TouchableOpacity>
                                             </View>
-                                        </TouchableOpacity>
-                                    ))}
-                                </View>
 
-                                <View style={[styles.collectionsHeader, { marginTop: 30 }]}>
-                                    <Text style={styles.sectionTitle}>POKEMON TCG POCKET</Text>
-                                    <TouchableOpacity onPress={() => setIsCollections(true)}>
-                                        <Text style={{ color: COLORS.energy, fontSize: 12, fontWeight: '700' }}>See All</Text>
-                                    </TouchableOpacity>
-                                </View>
-
-                                <View style={styles.setsGrid}>
-                                    {[
-                                        { name: 'Genetic Apex', count: 182, total: 226, logo: 'https://images.pokemontcg.io/a1/logo.png', color: COLORS.energy },
-                                        { name: 'Mythical Island', count: 42, total: 86, logo: 'https://images.pokemontcg.io/sm3/logo.png', color: '#4facfe' },
-                                    ].filter(s => s.name.toLowerCase().includes(searchQuery.toLowerCase())).map((set, idx) => (
-                                        <TouchableOpacity key={idx} style={styles.setCard} onPress={() => setIsCollections(true)}>
-                                            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                                                <View style={styles.setLogoContainer}>
-                                                    <Image source={{ uri: set.logo }} style={styles.setLogo} />
-                                                </View>
-                                                <View style={{ flex: 1 }}>
-                                                    <View style={styles.setCardInfo}>
-                                                        <Text style={styles.setCardName}>{set.name}</Text>
-                                                        <Text style={styles.setCardCount}>{set.count}/{set.total}</Text>
-                                                    </View>
-                                                    <View style={styles.progressContainer}>
-                                                        <View style={styles.progressBarBg}>
-                                                            <View style={[styles.progressBarFill, { width: `${(set.count / set.total) * 100}%`, backgroundColor: set.color }]} />
+                                            <View style={styles.setsGrid}>
+                                                {filteredSets.slice(0, 3).map((set, idx) => (
+                                                    <TouchableOpacity key={idx} style={styles.setCard} onPress={() => { setSelectedEra(section); setIsCollections(true); }}>
+                                                        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                                                            <View style={styles.setLogoContainer}>
+                                                                <Image source={{ uri: set.logo }} style={styles.setLogo} />
+                                                            </View>
+                                                            <View style={{ flex: 1 }}>
+                                                                <View style={styles.setCardInfo}>
+                                                                    <Text style={styles.setCardName}>{set.name}</Text>
+                                                                    <Text style={styles.setCardCount}>{set.count}/{set.total}</Text>
+                                                                </View>
+                                                                <View style={styles.progressContainer}>
+                                                                    <View style={styles.progressBarBg}>
+                                                                        <View style={[styles.progressBarFill, { width: `${(set.count / set.total) * 100}%`, backgroundColor: set.color }]} />
+                                                                    </View>
+                                                                    <Text style={styles.progressPct}>{Math.round((set.count / set.total) * 100)}%</Text>
+                                                                </View>
+                                                            </View>
                                                         </View>
-                                                        <Text style={styles.progressPct}>{Math.round((set.count / set.total) * 100)}%</Text>
-                                                    </View>
-                                                </View>
+                                                    </TouchableOpacity>
+                                                ))}
                                             </View>
-                                        </TouchableOpacity>
-                                    ))}
-                                </View>
+                                        </View>
+                                    );
+                                })}
                             </View>
                         </ScrollView>
 
@@ -533,7 +726,8 @@ export default function CardScanScreen() {
                             </TouchableOpacity>
                         </View>
                     </>
-                )}
+                )
+                }
             </SafeAreaView>
 
             {/* NATIVE MODAL FOR PAYWALL */}
@@ -637,8 +831,8 @@ const styles = StyleSheet.create({
     dashboardContainer: { flex: 1, width: '100%', paddingHorizontal: 20 },
     dashHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', height: 60, marginTop: 10, position: 'relative' },
     headerCenter: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, justifyContent: 'center', alignItems: 'center', zIndex: -1 },
-    appName: { color: '#FFF', fontSize: 20, fontWeight: '900', letterSpacing: -0.5 },
-    dashTitle: { color: '#FFF', fontSize: 20, fontWeight: '900', letterSpacing: 0.5 },
+    appName: { color: '#FFF', fontSize: 22, fontWeight: '900', letterSpacing: -0.5 },
+    dashTitle: { color: '#FFF', fontSize: 22, fontWeight: '900', letterSpacing: -0.5 },
     headerIconBtn: { padding: 10, zIndex: 10 },
     dashContent: { flex: 1, paddingTop: 20 },
     statsRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 35 },
@@ -646,7 +840,7 @@ const styles = StyleSheet.create({
     statVal: { color: '#FFF', fontSize: 24, fontWeight: '900' },
     statLabel: { color: 'rgba(255,255,255,0.3)', fontSize: 11, fontWeight: '700', marginTop: 4, letterSpacing: 1 },
     collectionsHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
-    sectionTitle: { color: 'rgba(255,255,255,0.4)', fontSize: 11, fontWeight: '900', letterSpacing: 2 },
+    sectionTitle: { color: 'rgba(255,255,255,0.4)', fontSize: 13, fontWeight: '800', letterSpacing: 0.5 },
     addFolderBtn: { width: 32, height: 32, borderRadius: 8, backgroundColor: 'rgba(139, 92, 246, 0.1)', justifyContent: 'center', alignItems: 'center' },
     collectionsGrid: { gap: 15 },
     collectionCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.05)', padding: 16, borderRadius: 8, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.2, shadowRadius: 10, elevation: 5 },
@@ -656,17 +850,17 @@ const styles = StyleSheet.create({
     colSub: { color: 'rgba(255,255,255,0.4)', fontSize: 13, marginTop: 4 },
     fabContainer: { position: 'absolute', bottom: 40, left: 0, right: 0, alignItems: 'center', zIndex: 100 },
     fabBtn: { width: 72, height: 72, borderRadius: 36, justifyContent: 'center', alignItems: 'center', shadowColor: COLORS.energy, shadowOpacity: 0.6, shadowRadius: 20, elevation: 10 },
-    heroStats: { backgroundColor: 'rgba(91, 33, 182, 0.25)', padding: 24, borderRadius: 8, marginBottom: 20, shadowColor: COLORS.primaryViolet, shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.3, shadowRadius: 20, elevation: 15 },
-    heroLabel: { color: 'rgba(255,255,255,0.5)', fontSize: 13, fontWeight: '700', letterSpacing: 1 },
-    heroPrice: { color: '#FFF', fontSize: 42, fontWeight: '900', marginTop: 8 },
-    heroTrend: { marginTop: 12 },
-    trendText: { color: COLORS.energy, fontSize: 14, fontWeight: '600' },
-
-    collectionsShortcut: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.06)', paddingVertical: 28, paddingHorizontal: 22, borderRadius: 8, marginBottom: 35, shadowColor: '#000', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.3, shadowRadius: 12, elevation: 8 },
-    shortcutIcon: { width: 48, height: 48, borderRadius: 8, backgroundColor: 'rgba(139, 92, 246, 0.1)', justifyContent: 'center', alignItems: 'center', marginRight: 16 },
-    shortcutInfo: { alignItems: 'center' },
-    shortcutTitle: { color: '#FFF', fontSize: 20, fontWeight: '800', letterSpacing: 1 },
-    shortcutSub: { color: 'rgba(255,255,255,0.4)', fontSize: 13, marginTop: 4, fontWeight: '600' },
+    heroCard: { borderRadius: 16, overflow: 'hidden', marginBottom: 35, elevation: 15, shadowColor: COLORS.primaryViolet, shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.4, shadowRadius: 20 },
+    heroGradient: { padding: 24 },
+    heroTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
+    heroLabel: { color: '#FFF', fontSize: 15, fontWeight: '800', letterSpacing: 0.5 },
+    trendBadge: { backgroundColor: 'rgba(255,255,255,0.15)', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20 },
+    trendBadgeText: { color: '#FFF', fontSize: 12, fontWeight: '800' },
+    heroPrice: { color: '#FFF', fontSize: 44, fontWeight: '900', marginBottom: 20 },
+    heroDivider: { height: 1, backgroundColor: 'rgba(255,255,255,0.1)', marginBottom: 20 },
+    heroBottom: { flexDirection: 'row', alignItems: 'center' },
+    heroStatItem: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+    heroStatText: { color: '#FFF', fontSize: 14, fontWeight: '700' },
 
     recentGrid: { flexDirection: 'row', gap: 15 },
     recentCard: { flex: 1, backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: 8, padding: 12, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.2, shadowRadius: 8, elevation: 4 },
@@ -718,7 +912,7 @@ const styles = StyleSheet.create({
 
     setsGrid: { gap: 12 },
     setCard: { backgroundColor: 'rgba(255,255,255,0.04)', borderRadius: 12, padding: 12 },
-    setLogoContainer: { width: 50, height: 50, backgroundColor: 'rgba(255,255,255,0.03)', borderRadius: 8, justifyContent: 'center', alignItems: 'center', marginRight: 15, padding: 4 },
+    setLogoContainer: { width: 64, height: 60, justifyContent: 'center', alignItems: 'center', marginRight: 15 },
     setLogo: { width: '100%', height: '100%', resizeMode: 'contain' },
     setCardInfo: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
     setCardName: { color: '#FFF', fontSize: 13, fontWeight: '700' },
@@ -750,7 +944,7 @@ const styles = StyleSheet.create({
     settingsPage: { flex: 1, paddingHorizontal: 20 },
     settingsHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', height: 60, marginTop: 10, marginBottom: 20 },
     backBtn: { padding: 10, marginLeft: -10 },
-    settingsTitle: { color: '#FFF', fontSize: 20, fontWeight: '900', letterSpacing: 0.5 },
+    settingsTitle: { color: '#FFF', fontSize: 22, fontWeight: '900', letterSpacing: -0.5 },
     settingsContent: { flex: 1 },
     settingsSectionTitle: { color: COLORS.energy, fontSize: 13, fontWeight: '800', marginBottom: 15, letterSpacing: 1.5, opacity: 0.8 },
     settingsCard: { backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: 8, paddingHorizontal: 16, marginBottom: 25, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.2, shadowRadius: 10, elevation: 5 },
@@ -793,10 +987,24 @@ const styles = StyleSheet.create({
     filterTextActive: { color: '#000' },
 
     cardsGridWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 15, justifyContent: 'space-between' },
-    collectionCardItem: { width: (width - 55) / 2, backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: 8, padding: 10, marginBottom: 5, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.2, shadowRadius: 8, elevation: 4 },
+    collectionCardItem: { width: (width - 55) / 2, backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: 8, padding: 10, marginBottom: 5, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.2, shadowRadius: 8, elevation: 4, borderWidth: 1, borderColor: 'transparent' },
     collectionCardImg: { width: '100%', height: 210, borderRadius: 6, resizeMode: 'contain' },
     cardItemInfo: { marginTop: 10, paddingHorizontal: 2 },
     cardItemName: { color: '#FFF', fontSize: 14, fontWeight: '800' },
     cardItemPrice: { color: COLORS.energy, fontSize: 13, fontWeight: '700', marginTop: 3 },
-    statValSmall: { color: '#FFF', fontSize: 18, fontWeight: '800' }
+    statValSmall: { color: '#FFF', fontSize: 18, fontWeight: '800' },
+    eraPageDivider: { height: 1, backgroundColor: 'rgba(255,255,255,0.08)', marginVertical: 30, width: '100%' },
+    largeLogoContainer: { width: '100%', height: 120, justifyContent: 'center', alignItems: 'center', marginBottom: 30 },
+    largeSetLogo: { width: '80%', height: '100%', resizeMode: 'contain' },
+    setUtilityBar: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 10, paddingVertical: 15, borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.05)' },
+    utilBtn: { width: 44, height: 44, borderRadius: 22, backgroundColor: 'rgba(255,255,255,0.05)', justifyContent: 'center', alignItems: 'center' },
+    utilPlusBtn: { width: 56, height: 56, borderRadius: 28, backgroundColor: 'rgba(255,255,255,0.1)', justifyContent: 'center', alignItems: 'center' },
+    counterRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 8, backgroundColor: 'rgba(255,255,255,0.03)', borderRadius: 20, padding: 4 },
+    counterBtn: { width: 24, height: 24, borderRadius: 12, backgroundColor: 'rgba(255,255,255,0.1)', justifyContent: 'center', alignItems: 'center' },
+    counterVal: { color: '#FFF', fontSize: 14, fontWeight: '900' },
+    cardQtyBadge: { position: 'absolute', top: 8, right: 8, backgroundColor: COLORS.energy, borderRadius: 10, minWidth: 20, height: 20, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 4 },
+    cardQtyText: { color: '#000', fontSize: 11, fontWeight: '900' },
+    addToCollectionPanel: { position: 'absolute', bottom: 100, left: 20, right: 20, backgroundColor: '#111', borderRadius: 16, padding: 20, flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)', shadowColor: '#000', shadowOpacity: 0.5, shadowRadius: 20, elevation: 15 },
+    addCtaBtn: { backgroundColor: COLORS.energy, paddingHorizontal: 24, paddingVertical: 12, borderRadius: 8 },
+    addCtaText: { color: '#000', fontSize: 14, fontWeight: '900' }
 });
